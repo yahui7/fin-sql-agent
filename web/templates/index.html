@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏦 金融数据查询 Agent</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, "Microsoft YaHei", sans-serif;
+            background: #f5f6fa;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: #1a1a2e;
+            color: #fff;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header h1 { font-size: 20px; font-weight: 600; }
+        .header .actions button {
+            background: #e94560;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .header .actions button:hover { background: #d63a55; }
+
+        .chat-box {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            max-width: 900px;
+            width: 100%;
+            margin: 0 auto;
+        }
+
+        .message {
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+        }
+        .message.user { align-items: flex-end; }
+        .message.assistant { align-items: flex-start; }
+
+        .bubble {
+            max-width: 75%;
+            padding: 12px 16px;
+            border-radius: 12px;
+            line-height: 1.6;
+            font-size: 15px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .message.user .bubble {
+            background: #4361ee;
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+        .message.assistant .bubble {
+            background: #fff;
+            color: #333;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .steps {
+            margin: 6px 0 4px;
+            font-size: 13px;
+            color: #666;
+        }
+        .step-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 2px 0;
+            font-family: "Consolas", monospace;
+        }
+        .step-item .icon { flex-shrink: 0; }
+
+        .input-area {
+            background: #fff;
+            border-top: 1px solid #e0e0e0;
+            padding: 16px 24px;
+            display: flex;
+            gap: 12px;
+            max-width: 900px;
+            width: 100%;
+            margin: 0 auto;
+        }
+        .input-area input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+        }
+        .input-area input:focus { border-color: #4361ee; }
+        .input-area button {
+            background: #4361ee;
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+        }
+        .input-area button:hover { background: #3552d1; }
+        .input-area button:disabled { background: #a0a8c0; cursor: not-allowed; }
+
+        .loading {
+            display: inline-block;
+            color: #4361ee;
+            font-size: 14px;
+            animation: blink 1s infinite;
+        }
+        @keyframes blink { 50% { opacity: 0.3; } }
+
+        table {
+            border-collapse: collapse;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        table th, table td {
+            border: 1px solid #ddd;
+            padding: 6px 12px;
+            text-align: left;
+        }
+        table th { background: #f0f2ff; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏦 金融数据查询 Agent</h1>
+        <div class="actions">
+            <button onclick="clearMemory()">清空记忆</button>
+        </div>
+    </div>
+
+    <div class="chat-box" id="chatBox">
+        <div class="message assistant">
+            <div class="bubble">你好！我是金融数据查询助手。你可以问我客户信息、交易流水、数据质量等问题。</div>
+        </div>
+    </div>
+
+    <div class="input-area">
+        <input id="questionInput" placeholder="输入查询，例如：7月交易金额最高的5笔是什么？" />
+        <button id="sendBtn" onclick="send()">发送</button>
+    </div>
+
+    <script>
+        // 每个浏览器生成一个 session_id，存在 localStorage，刷新不丢
+        function getSessionId() {
+            let sid = localStorage.getItem('session_id');
+            if (!sid) {
+                sid = 'session_' + Math.random().toString(36).substr(2, 12);
+                localStorage.setItem('session_id', sid);
+            }
+            return sid;
+        }
+
+        function addMessage(role, content, steps) {
+            const box = document.getElementById('chatBox');
+            const msg = document.createElement('div');
+            msg.className = 'message ' + role;
+
+            // 步骤区（只有 assistant 且有步骤时显示）
+            if (steps && steps.length > 0) {
+                const stepsDiv = document.createElement('div');
+                stepsDiv.className = 'steps';
+                steps.forEach(s => {
+                    const item = document.createElement('div');
+                    item.className = 'step-item';
+                    if (s.type === 'tool_call') {
+                        let args = '';
+                        try { args = JSON.stringify(s.args); } catch(e) {}
+                        item.innerHTML = '<span class="icon">🔧</span>' +
+                            s.name + '(' + args + ')';
+                    } else if (s.type === 'tool_result') {
+                        item.innerHTML = '<span class="icon">📦</span>' + s.preview;
+                    } else if (s.type === 'complete') {
+                        item.innerHTML = '<span class="icon">✅</span>完成，共 ' + s.step + ' 步';
+                    }
+                    stepsDiv.appendChild(item);
+                });
+                msg.appendChild(stepsDiv);
+            }
+
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.textContent = content;
+            msg.appendChild(bubble);
+
+            box.appendChild(msg);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        async function send() {
+            const input = document.getElementById('questionInput');
+            const question = input.value.trim();
+            if (!question) return;
+
+            const btn = document.getElementById('sendBtn');
+            btn.disabled = true;
+
+            // 显示用户消息
+            addMessage('user', question);
+            input.value = '';
+
+            // 显示加载中
+            const box = document.getElementById('chatBox');
+            const loading = document.createElement('div');
+            loading.className = 'message assistant';
+            loading.innerHTML = '<div class="bubble"><span class="loading">思考中...</span></div>';
+            loading.id = 'loadingMsg';
+            box.appendChild(loading);
+            box.scrollTop = box.scrollHeight;
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: getSessionId(),
+                        question: question,
+                    }),
+                });
+                const data = await response.json();
+
+                // 移除加载中
+                document.getElementById('loadingMsg').remove();
+
+                if (data.error) {
+                    addMessage('assistant', '❌ ' + data.error);
+                } else {
+                    addMessage('assistant', data.answer, data.steps);
+                }
+            } catch (e) {
+                document.getElementById('loadingMsg').remove();
+                addMessage('assistant', '❌ 请求失败: ' + e.message);
+            } finally {
+                btn.disabled = false;
+                input.focus();
+            }
+        }
+
+        async function clearMemory() {
+            await fetch('/clear', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: getSessionId(), question: '' }),
+            });
+            addMessage('assistant', '🧹 对话记忆已清空');
+        }
+
+        // 回车发送
+        document.getElementById('questionInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') send();
+        });
+    </script>
+</body>
+</html>

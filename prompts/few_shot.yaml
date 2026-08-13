@@ -1,0 +1,89 @@
+# 金融数据 SQL 查询示例
+
+# 这些示例会嵌入系统提示词，帮助 Agent 理解如何生成正确的 SQL。
+# 每个示例包含：用户问题、Agent 思路、工具调用序列、最终 SQL。
+
+examples:
+
+  - question: "证件有效期过期的客户有多少？"
+    thought: |
+      需要查 customer 表。先看表结构确认 id_expiry_date 字段存在。
+      这是数据质量问题，用 IS NULL 和日期比较。
+    tools:
+      - get_table_info:
+          table_name: customer
+      - query_db:
+          sql: |
+            SELECT COUNT(*) AS expired_count
+            FROM customer
+            WHERE id_expiry_date IS NOT NULL
+              AND id_expiry_date != ''
+              AND id_expiry_date < CURDATE()
+
+  - question: "姓名里包含 * 的客户有哪些？"
+    thought: |
+      用户指定了具体字符 *，用 LIKE 精确匹配。
+      不需要先查表结构（已知 customer 有 name 字段），
+      但为了稳妥还是先确认字段名。
+    tools:
+      - get_table_info:
+          table_name: customer
+      - query_db:
+          sql: |
+            SELECT customer_id, name
+            FROM customer
+            WHERE name LIKE '%*%'
+
+  - question: "有没有客户同时持有基金和理财产品的账户？"
+    thought: |
+      需要关联 account 和 product 表。先确认两张表的字段名。
+      用 JOIN + GROUP BY + HAVING COUNT(DISTINCT product_type) > 1。
+    tools:
+      - get_table_info:
+          table_name: account
+      - get_table_info:
+          table_name: product
+      - query_db:
+          sql: |
+            SELECT a.customer_id, c.name,
+                   COUNT(DISTINCT a.account_id) AS account_count,
+                   GROUP_CONCAT(DISTINCT p.product_type) AS product_types
+            FROM account a
+            JOIN product p ON a.product_id = p.product_id
+            JOIN customer c ON a.customer_id = c.customer_id
+            WHERE p.product_type IN ('理财', '公募-混合型', '公募-债券型', '私募-股票多头')
+            GROUP BY a.customer_id, c.name
+            HAVING COUNT(DISTINCT p.product_type) >= 2
+            LIMIT 100
+
+  - question: "7 月交易金额最高的 5 笔是什么？"
+    thought: |
+      查 transactions 表。先确认字段名。
+      用 WHERE transaction_date 过滤 7 月，ORDER BY amount DESC LIMIT 5。
+    tools:
+      - get_table_info:
+          table_name: transactions
+      - query_db:
+          sql: |
+            SELECT transaction_id, customer_id, amount, currency,
+                   transaction_type, transaction_date, counterparty_info
+            FROM transactions
+            WHERE transaction_date >= '2026-07-01'
+              AND transaction_date < '2026-08-01'
+            ORDER BY amount DESC
+            LIMIT 5
+
+  - question: "哪些客户的手机号格式不对？"
+    thought: |
+      数据质量问题。手机号应该是 1 开头的 11 位数字。
+      用 NOT REGEXP 找出不符合规则的。
+    tools:
+      - get_table_info:
+          table_name: customer
+      - query_db:
+          sql: |
+            SELECT customer_id, name, phone
+            FROM customer
+            WHERE phone IS NOT NULL
+              AND phone != ''
+              AND phone NOT REGEXP '^1[0-9]{10}$'
