@@ -1,7 +1,13 @@
 """
 数据库工具函数
 提供三个核心能力：查表结构、看表详情、执行 SQL
+
+安全设计：
+  1. 表名白名单（层次B）：只允许查询数据库中真实存在的表
+  2. 连接管理：使用 get_cursor() 上下文管理器，保证连接一定关闭
 """
+
+from contextlib import contextmanager
 
 import mysql.connector
 from config import DB_CONFIG
@@ -10,6 +16,56 @@ from config import DB_CONFIG
 def get_conn():
     """获取 MySQL 数据库连接"""
     return mysql.connector.connect(**DB_CONFIG)
+
+
+@contextmanager
+def get_cursor():
+    """
+    上下文管理器：获取游标，用完自动关闭游标和连接。
+
+    用法:
+        with get_cursor() as cur:
+            cur.execute(sql)
+            rows = cur.fetchall()
+
+    无论中间是否抛异常，连接都会被关闭，避免连接泄漏。
+    """
+    conn = get_conn()
+    cur = conn.cursor(dictionary=True)
+    try:
+        yield cur
+    finally:
+        cur.close()
+        conn.close()
+
+
+# ============================================================
+# 表名白名单
+# ============================================================
+def _get_valid_tables() -> set:
+    """查询数据库中真实存在的所有表名"""
+    with get_cursor() as cur:
+        cur.execute("SHOW TABLES")
+        # SHOW TABLES 返回 {"Tables_in_<db>": "customer"} 形式
+        tables = {row[list(row.keys())[0]] for row in cur.fetchall()}
+    return tables
+
+
+def _validate_table_name(table_name: str) -> str | None:
+    """
+    校验表名是否合法（层次B：必须在真实表列表里）。
+
+    返回:
+        None = 合法
+        str  = 错误信息
+    """
+    if not table_name:
+        return "表名不能为空"
+
+    if table_name not in _get_valid_tables():
+        return f"表 {table_name} 不存在"
+
+    return None
 
 
 # ============================================================
@@ -26,12 +82,9 @@ def get_schema() -> dict:
         WHERE TABLE_SCHEMA = %s
         ORDER BY TABLE_NAME, ORDINAL_POSITION
     """
-    conn = get_conn()
-    cur = conn.cursor(dictionary=True)
-    cur.execute(sql, (DB_CONFIG["database"],))
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
+    with get_cursor() as cur:
+        cur.execute(sql, (DB_CONFIG["database"],))
+        rows = cur.fetchall()
 
     tables = {}
     for row in rows:
@@ -61,24 +114,21 @@ def get_table_info(table_name: str) -> dict:
     - 前 3 行样本数据
     这是 Agent 生成 SQL 前必须调用的工具——确认字段名。
     """
-    if not table_name:
-        return {"error": "参数 table_name 不能为空"}
+    # 表名白名单校验
+    err = _validate_table_name(table_name)
+    if err:
+        return {"error": err}
 
     try:
-        conn = get_conn()
-        cur = conn.cursor(dictionary=True)
+        with get_cursor() as cur:
+            # 总行数
+            cur.execute(f"SELECT COUNT(*) AS cnt FROM `{table_name}`")
+            count = cur.fetchone()["cnt"]
 
-        # 总行数
-        cur.execute(f"SELECT COUNT(*) AS cnt FROM `{table_name}`")
-        count = cur.fetchone()["cnt"]
-
-        # 前 3 行样本
-        cur.execute(f"SELECT * FROM `{table_name}` LIMIT 3")
-        rows = cur.fetchall()
-        columns = list(rows[0].keys()) if rows else []
-
-        cur.close()
-        conn.close()
+            # 前 3 行样本
+            cur.execute(f"SELECT * FROM `{table_name}` LIMIT 3")
+            rows = cur.fetchall()
+            columns = list(rows[0].keys()) if rows else []
 
         return {
             "table": table_name,
@@ -127,13 +177,10 @@ def query_db(sql: str) -> dict:
 
     # === 执行查询 ===
     try:
-        conn = get_conn()
-        cur = conn.cursor(dictionary=True)
-        cur.execute(sql)
-        rows = cur.fetchall()
-        columns = list(rows[0].keys()) if rows else []
-        cur.close()
-        conn.close()
+        with get_cursor() as cur:
+            cur.execute(sql)
+            rows = cur.fetchall()
+            columns = list(rows[0].keys()) if rows else []
 
         return {
             "columns": columns,
