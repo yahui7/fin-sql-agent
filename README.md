@@ -1,102 +1,133 @@
-# Text2SQL Agent — 代码版
+# fin-sql-agent
 
-> 用 DeepSeek + MySQL 搭建的金融数据查询 Agent，支持自然语言查询和数据质量检查。
+基于 DeepSeek + MySQL 的金融数据自然语言查询 Agent。用自然语言提问，得到解析后的查询结果，内置生产级的治理能力。
+
+## 功能特性
+
+- **ReAct 循环** — LLM 自主规划每一步：查看表结构 → 确认字段 → 生成 SQL → 执行 → 解读结果
+- **多轮对话记忆** — 记住上下文，支持追问
+- **Web 界面**（FastAPI）— 浏览器交互式聊天
+- **Harness 治理层**
+  - 基于角色的权限控制（`admin` / `viewer`）
+  - SQL 护栏（只读强制、危险关键字拦截）
+  - 敏感信息脱敏（身份证号、手机号）
+  - 审计日志（JSON Lines）
+  - 指标监控
+- **命令行入口**，支持统计报告
 
 ## 架构
 
 ```
-用户（命令行）
+用户（命令行 或 浏览器）
     ↓
-main.py ─── 交互循环
+main.py / web/app.py ─── 入口
     ↓
-agent.py ─── ReAct 循环（思考 → 调工具 → 看结果 → 再思考）
+agent.py ─── ReAct 循环（思考 → 调工具 → 观察 → 重复）
     ↓
-llm.py ─── DeepSeek API（OpenAI SDK 格式的 Function Calling）
+llm.py ─── DeepSeek API（OpenAI 兼容的 Function Calling）
     ↓
-tools/database.py ─── MySQL 查询（本地直连，无需 ngrok）
+tools/database.py ─── MySQL 查询（本地直连）
     ↓
-MySQL（financial 数据库，4 张金融表）
+MySQL（financial 数据库，4 张表）
 ```
 
-## 文件说明
+```
+请求 → run(question, role)
+            ├─ before_request(role, question)   → 指标 + 审计
+            ├─ before_tool(role, tool, args)    → 权限 + SQL 护栏
+            ├─ execute_tool(...)                → 实际执行
+            ├─ after_tool(tool, result)         → 敏感信息脱敏
+            └─ on_complete(answer)              → 指标 + 审计
+```
 
-| 文件 | 作用 | 你该看什么 |
-|-----|------|----------|
-| `agent.py` | **ReAct 循环核心** | 最重要！理解 Agent 怎么"想→做→看"循环 |
-| `main.py` | 命令行入口 | 交互循环很简单 |
-| `llm.py` | DeepSeek 封装 | Function Calling 怎么传参的 |
-| `config.py` | 集中配置 | 改密码和 API Key |
-| `tools/registry.py` | 工具注册 | Python 函数怎么变成 LLM 的 tool |
-| `tools/database.py` | 数据库操作 | 3 个工具的具体实现 |
-| `prompts/system.md` | 系统提示词 | Agent 的"大脑"，控制行为 |
-| `prompts/few_shot.yaml` | 查询示例 | 帮助 Agent 理解 SQL 模式 |
-| `scripts/import_data.py` | 数据导入 | CSV → MySQL |
+## 项目结构
 
-## 启动步骤
+| 文件 / 目录 | 用途 |
+|------------|------|
+| `agent.py` | ReAct 循环核心 |
+| `main.py` | 命令行入口 |
+| `llm.py` | DeepSeek API 封装（Function Calling） |
+| `memory.py` | 多轮对话记忆 |
+| `config.py` | 集中配置 |
+| `tools/` | 数据库工具 + 工具注册 |
+| `harness/` | 治理层（权限、护栏、审计、监控） |
+| `web/` | FastAPI Web 服务 + 聊天界面 |
+| `prompts/` | 系统提示词 + few-shot 示例 |
+| `scripts/import_data.py` | CSV → MySQL 导入 |
+| `tests/` | 测试套件 |
+
+## 快速开始
 
 ### 1. 安装依赖
 
 ```bash
-pip install openai mysql-connector-python
+pip install -r requirements.txt
 ```
 
-### 2. 创建数据库
+### 2. 配置环境变量
+
+复制 `.env.example` 为 `.env`，填入你的凭据：
+
+```bash
+DEEPSEEK_API_KEY=你的API密钥
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-chat
+MYSQL_PASSWORD=你的MySQL密码
+MYSQL_DATABASE=financial
+```
+
+> **切勿提交 `.env`** — 它包含密钥，已被 gitignore 忽略。
+
+### 3. 创建数据库
 
 ```sql
 CREATE DATABASE financial CHARACTER SET utf8mb4;
 ```
 
-### 3. 导入金融数据
+### 4. 导入示例数据
 
 ```bash
 cd scripts
 python import_data.py
 ```
 
-### 4. 修改 config.py
-
-- `LLM_CONFIG.api_key` → 你的 DeepSeek API Key
-- `DB_CONFIG.password` → 你的 MySQL 密码
-- `DB_CONFIG.database` → 你的库名
-
-### 5. 开始查询
+### 5. 运行
 
 ```bash
+# 命令行模式
 python main.py
+
+# Web 模式
+uvicorn web.app:app --host 0.0.0.0 --port 8765
+# 然后打开 http://localhost:8765
 ```
 
-## 测试问题
+## 示例查询
 
 | 类型 | 问题 | 预期行为 |
-|-----|------|---------|
-| 基础 | 数据库有哪些表？ | get_schema → 列出 4 张表 |
-| 业务 | 7 月交易金额最高的 5 笔 | get_table_info → SQL → 结果 |
-| 质量 | 有多少客户没填证件有效期？ | get_table_info → IS NULL SQL |
-| 质量 | 姓名包含 * 的客户 | LIKE '%*%' SQL |
+|------|------|---------|
+| 基础 | 数据库有哪些表？ | get_schema → 列出表 |
+| 业务 | 7 月交易金额最高的 5 笔？ | schema → table_info → SQL → 结果 |
+| 数据质量 | 有多少客户没填证件有效期？ | table_info → IS NULL SQL |
+| 数据质量 | 姓名里含 `*` 的客户？ | LIKE '%*%' SQL |
 | 关联 | 余额最高的 5 个账户属于谁？ | JOIN account + customer |
-| 混合 | 没填有效期的客户有没有仍在交易的？ | 子查询或 JOIN + IS NULL |
+| 混合 | 没填有效期的客户还有交易吗？ | 子查询 / JOIN + IS NULL |
 
-## 批量测试
+## 测试
 
 ```bash
 python tests/test_queries.py
 ```
 
-## 学习路线
+## 配置说明
 
-1. **先跑通**：改 config.py → 导数据 → `python main.py` → 问一个问题
-2. **读 agent.py**：理解 ReAct 循环的 for 循环结构
-3. **读 prompts/system.md**：理解提示词怎么控制 Agent 行为
-4. **改工具**：在 `tools/database.py` 加一个新函数，在 `registry.py` 注册
-5. **拆 Agent**：把 Agent 拆成 SchemaAgent + SQLAgent + ReviewAgent
+| 配置项 | 说明 |
+|--------|------|
+| `LLM_CONFIG` | 模型、API Key、base URL、温度 |
+| `DB_CONFIG` | MySQL 连接 |
+| `AGENT_CONFIG` | 最大迭代次数、记忆轮数、详细模式 |
+| `HARNESS_CONFIG` | 角色、审计日志路径 |
 
-## 和 Dify 版的对应关系
+## 技术栈
 
-| Dify 版 | 代码版 | 说明 |
-|--------|-------|------|
-| Agent 节点 | `agent.py` | ReAct 循环 |
-| Instructions 字段 | `prompts/system.md` | 系统提示词 |
-| 自定义 API 工具 | `tools/database.py` | 工具函数 |
-| 导入 OpenAPI JSON | `tools/registry.py` | 工具注册 |
-| 日志面板 | 终端 print | 观察 ReAct 过程 |
-| ngrok 隧道 | 不需要 | 本地直连 |
+Python · FastAPI · DeepSeek API · MySQL
