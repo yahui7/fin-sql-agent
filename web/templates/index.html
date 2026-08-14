@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🏦 金融数据查询 Agent</title>
+    <title>🏦 金融数据查询平台</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -15,6 +15,7 @@
             flex-direction: column;
         }
 
+        /* ============ 顶部导航 ============ */
         .header {
             background: #1a1a2e;
             color: #fff;
@@ -24,6 +25,8 @@
             justify-content: space-between;
         }
         .header h1 { font-size: 20px; font-weight: 600; }
+        .header .actions { display: flex; gap: 10px; align-items: center; }
+        .header .user-tag { font-size: 14px; color: #a0a8c0; }
         .header .actions button {
             background: #e94560;
             color: #fff;
@@ -34,6 +37,83 @@
             font-size: 14px;
         }
         .header .actions button:hover { background: #d63a55; }
+        .header .actions button.primary {
+            background: #4361ee;
+        }
+        .header .actions button.primary:hover { background: #3552d1; }
+
+        /* ============ 主页（未登录） ============ */
+        #loginPage {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .hero {
+            text-align: center;
+            padding: 80px 24px 40px;
+        }
+        .hero .logo { font-size: 56px; }
+        .hero h2 {
+            font-size: 34px;
+            color: #1a1a2e;
+            margin: 20px 0 12px;
+        }
+        .hero p {
+            font-size: 17px;
+            color: #666;
+            line-height: 1.7;
+        }
+        .hero .login-btn {
+            margin-top: 30px;
+            background: #4361ee;
+            color: #fff;
+            border: none;
+            padding: 14px 48px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 17px;
+            font-weight: 600;
+        }
+        .hero .login-btn:hover { background: #3552d1; }
+        .hero .demo-accounts {
+            margin-top: 24px;
+            font-size: 14px;
+            color: #999;
+            line-height: 1.8;
+        }
+
+        .features {
+            display: flex;
+            gap: 20px;
+            padding: 20px 24px 60px;
+            max-width: 900px;
+            width: 100%;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .feature-card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 28px 24px;
+            width: 250px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transition: transform 0.15s;
+        }
+        .feature-card:hover { transform: translateY(-4px); }
+        .feature-card .icon { font-size: 32px; }
+        .feature-card h3 { font-size: 17px; color: #1a1a2e; margin: 12px 0 8px; }
+        .feature-card p { font-size: 14px; color: #666; line-height: 1.6; }
+
+        /* ============ 聊天界面（登录后） ============ */
+        #chatPage {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
 
         .chat-box {
             flex: 1;
@@ -139,29 +219,159 @@
             text-align: left;
         }
         table th { background: #f0f2ff; }
+
+        /* ============ 登录弹窗 ============ */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: #fff;
+            border-radius: 12px;
+            padding: 36px 32px;
+            width: 340px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .modal h3 { font-size: 20px; color: #1a1a2e; text-align: center; margin-bottom: 24px; }
+        .modal label { display: block; font-size: 14px; color: #666; margin-bottom: 6px; }
+        .modal input {
+            width: 100%;
+            padding: 11px 14px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 15px;
+            margin-bottom: 16px;
+            outline: none;
+        }
+        .modal input:focus { border-color: #4361ee; }
+        .modal .login-submit {
+            width: 100%;
+            background: #4361ee;
+            color: #fff;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+        .modal .login-submit:hover { background: #3552d1; }
+        .modal .error {
+            color: #e94560;
+            font-size: 13px;
+            text-align: center;
+            margin-top: 12px;
+            min-height: 18px;
+        }
+        .modal .close {
+            float: right;
+            cursor: pointer;
+            color: #999;
+            font-size: 20px;
+            border: none;
+            background: none;
+        }
     </style>
 </head>
 <body>
+
+    <!-- ============ 顶部导航 ============ -->
     <div class="header">
-        <h1>🏦 金融数据查询 Agent</h1>
+        <h1>🏦 金融数据查询平台</h1>
         <div class="actions">
-            <button onclick="clearMemory()">清空记忆</button>
+            <span class="user-tag" id="userTag"></span>
+            <button class="primary" id="loginBtn" onclick="openLoginModal()">登录</button>
+            <button id="logoutBtn" onclick="doLogout()" style="display:none;">退出</button>
         </div>
     </div>
 
-    <div class="chat-box" id="chatBox">
-        <div class="message assistant">
-            <div class="bubble">你好！我是金融数据查询助手。你可以问我客户信息、交易流水、数据质量等问题。</div>
+    <!-- ============ 主页（未登录） ============ -->
+    <div id="loginPage">
+        <div class="hero">
+            <div class="logo">📊</div>
+            <h2>企业数据，一问了然</h2>
+            <p>用自然语言查询客户、交易、产品数据<br>无需懂 SQL，直接提问即可</p>
+            <button class="login-btn" onclick="openLoginModal()">🔐 登录后开始查询</button>
+            <div class="demo-accounts">
+                <b>演示账号：</b><br>
+                admin / admin123 —— 管理员（可查询全部数据）<br>
+                view / viewer —— 访客（仅可查看表结构，不可查询数据）
+            </div>
+        </div>
+        <div class="features">
+            <div class="feature-card">
+                <div class="icon">🔍</div>
+                <h3>智能查询</h3>
+                <p>自然语言提问，自动转 SQL，无需编写查询语句</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon">🛡️</div>
+                <h3>数据脱敏</h3>
+                <p>身份证号、手机号自动打码，保护敏感信息</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon">📋</div>
+                <h3>审计日志</h3>
+                <p>每次查询全程记录，合规可追溯</p>
+            </div>
         </div>
     </div>
 
-    <div class="input-area">
-        <input id="questionInput" placeholder="输入查询，例如：7月交易金额最高的5笔是什么？" />
-        <button id="sendBtn" onclick="send()">发送</button>
+    <!-- ============ 聊天界面（登录后） ============ -->
+    <div id="chatPage" style="display:none;">
+        <div class="chat-box" id="chatBox">
+            <div class="message assistant">
+                <div class="bubble">你好！我是金融数据查询助手。你可以问我客户信息、交易流水、数据质量等问题。</div>
+            </div>
+        </div>
+        <div class="input-area">
+            <input id="questionInput" placeholder="输入查询，例如：7月交易金额最高的5笔是什么？" />
+            <button id="sendBtn" onclick="send()">发送</button>
+        </div>
+    </div>
+
+    <!-- ============ 登录弹窗 ============ -->
+    <div class="modal-overlay" id="loginModal">
+        <div class="modal">
+            <button class="close" onclick="closeLoginModal()">×</button>
+            <h3>🔐 登录</h3>
+            <label>用户名</label>
+            <input id="loginUsername" placeholder="请输入用户名" />
+            <label>密码</label>
+            <input id="loginPassword" type="password" placeholder="请输入密码" />
+            <button class="login-submit" onclick="doLogin()">登 录</button>
+            <div class="error" id="loginError"></div>
+        </div>
     </div>
 
     <script>
-        // 每个浏览器生成一个 session_id，存在 localStorage，刷新不丢
+        // ============ Token 管理 ============
+        function getToken() { return localStorage.getItem('token'); }
+        function setToken(t) { localStorage.setItem('token', t); }
+        function clearToken() { localStorage.removeItem('token'); }
+
+        // ============ 用户信息管理 ============
+        function getUserInfo() {
+            const username = localStorage.getItem('username');
+            const role = localStorage.getItem('role');
+            return (username && role) ? { username, role } : null;
+        }
+        function setUserInfo(username, role) {
+            localStorage.setItem('username', username);
+            localStorage.setItem('role', role);
+        }
+        function clearUserInfo() {
+            localStorage.removeItem('username');
+            localStorage.removeItem('role');
+        }
+
         function getSessionId() {
             let sid = localStorage.getItem('session_id');
             if (!sid) {
@@ -171,12 +381,83 @@
             return sid;
         }
 
+        // ============ 页面切换 ============
+        function showChatPage(username, role) {
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('chatPage').style.display = 'flex';
+            document.getElementById('loginBtn').style.display = 'none';
+            document.getElementById('logoutBtn').style.display = 'inline-block';
+            document.getElementById('userTag').textContent = `${username}（${role}）`;
+        }
+
+        function showLoginPage() {
+            document.getElementById('loginPage').style.display = 'flex';
+            document.getElementById('chatPage').style.display = 'none';
+            document.getElementById('loginBtn').style.display = 'inline-block';
+            document.getElementById('logoutBtn').style.display = 'none';
+            document.getElementById('userTag').textContent = '';
+        }
+
+        // ============ 登录弹窗 ============
+        function openLoginModal() {
+            document.getElementById('loginModal').classList.add('show');
+            document.getElementById('loginError').textContent = '';
+        }
+        function closeLoginModal() {
+            document.getElementById('loginModal').classList.remove('show');
+        }
+
+        async function doLogin() {
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value;
+
+            if (!username || !password) {
+                document.getElementById('loginError').textContent = '请输入用户名和密码';
+                return;
+            }
+
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password }),
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    setToken(data.token);
+                    setUserInfo(data.username, data.role);
+                    closeLoginModal();
+                    showChatPage(data.username, data.role);
+                } else {
+                    document.getElementById('loginError').textContent = data.error || '登录失败';
+                }
+            } catch (e) {
+                document.getElementById('loginError').textContent = '请求失败: ' + e.message;
+            }
+        }
+
+        async function doLogout() {
+            const token = getToken();
+            if (token) {
+                try {
+                    await fetch('/logout', {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + token },
+                    });
+                } catch (e) {}
+            }
+            clearToken();
+            clearUserInfo();
+            showLoginPage();
+        }
+
+        // ============ 聊天 ============
         function addMessage(role, content, steps) {
             const box = document.getElementById('chatBox');
             const msg = document.createElement('div');
             msg.className = 'message ' + role;
 
-            // 步骤区（只有 assistant 且有步骤时显示）
             if (steps && steps.length > 0) {
                 const stepsDiv = document.createElement('div');
                 stepsDiv.className = 'steps';
@@ -212,14 +493,19 @@
             const question = input.value.trim();
             if (!question) return;
 
+            const token = getToken();
+            if (!token) {
+                showLoginPage();
+                openLoginModal();
+                return;
+            }
+
             const btn = document.getElementById('sendBtn');
             btn.disabled = true;
 
-            // 显示用户消息
             addMessage('user', question);
             input.value = '';
 
-            // 显示加载中
             const box = document.getElementById('chatBox');
             const loading = document.createElement('div');
             loading.className = 'message assistant';
@@ -231,7 +517,10 @@
             try {
                 const response = await fetch('/chat', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + token,
+                    },
                     body: JSON.stringify({
                         session_id: getSessionId(),
                         question: question,
@@ -239,10 +528,15 @@
                 });
                 const data = await response.json();
 
-                // 移除加载中
                 document.getElementById('loadingMsg').remove();
 
-                if (data.error) {
+                if (response.status === 401) {
+                    clearToken();
+                    clearUserInfo();
+                    showLoginPage();
+                    openLoginModal();
+                    document.getElementById('loginError').textContent = '登录已过期，请重新登录';
+                } else if (data.error) {
                     addMessage('assistant', '❌ ' + data.error);
                 } else {
                     addMessage('assistant', data.answer, data.steps);
@@ -257,18 +551,38 @@
         }
 
         async function clearMemory() {
+            const token = getToken();
             await fetch('/clear', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                },
                 body: JSON.stringify({ session_id: getSessionId(), question: '' }),
             });
             addMessage('assistant', '🧹 对话记忆已清空');
         }
 
-        // 回车发送
         document.getElementById('questionInput').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') send();
         });
+
+        // ============ 页面初始化 ============
+        (function init() {
+            const token = getToken();
+            if (token) {
+                const user = getUserInfo();
+                if (user) {
+                    showChatPage(user.username, user.role);
+                } else {
+                    // 有 token 但无用户信息（异常情况），清掉重来
+                    clearToken();
+                    showLoginPage();
+                }
+            } else {
+                showLoginPage();
+            }
+        })();
     </script>
 </body>
 </html>

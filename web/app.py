@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 # 确保能导入项目根目录的模块
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Header
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
@@ -23,6 +23,7 @@ from config import AGENT_CONFIG, HARNESS_CONFIG
 from agent import run
 from memory import ConversationMemory
 from harness import Harness
+from auth_service import login, get_user_from_token, logout
 
 app = FastAPI(title="金融数据查询 Agent")
 
@@ -81,6 +82,11 @@ class ChatRequest(BaseModel):
     question: str
 
 
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
 # ============================================================
 # 路由
 # ============================================================
@@ -92,17 +98,46 @@ def index():
         return HTMLResponse(content=f.read())
 
 
+@app.post("/login")
+def login_endpoint(req: LoginRequest):
+    """登录：验证用户名密码，返回 token"""
+    result = login(req.username, req.password)
+    if not result:
+        return JSONResponse({"error": "用户名或密码错误"}, status_code=401)
+    return result
+
+
+@app.post("/logout")
+def logout_endpoint(authorization: str = Header(None)):
+    """退出登录：使 token 失效"""
+    token = _extract_token(authorization)
+    logout(token)
+    return {"ok": True}
+
+
+def _extract_token(authorization: str | None) -> str:
+    """从 Authorization header 提取 token"""
+    if authorization and authorization.startswith("Bearer "):
+        return authorization[7:]
+    return ""
+
+
 @app.post("/chat")
-def chat(req: ChatRequest):
+def chat(req: ChatRequest, authorization: str = Header(None)):
     """处理一次查询：调 Agent，返回答案和 ReAct 步骤"""
     if not req.question.strip():
         return JSONResponse({"error": "问题不能为空"}, status_code=400)
 
     # ============================================================
-    # 角色解析：当前写死 admin，将来接入登录后从 token 里取
-    #   将来：role = get_current_user(token).role
+    # 认证：从 token 解析用户，拿到真实角色
     # ============================================================
-    role = "admin"
+    token = _extract_token(authorization)
+    user = get_user_from_token(token)
+    if not user:
+        return JSONResponse({"error": "未登录或登录已过期"}, status_code=401)
+
+    role = user["role"]
+    username = user["username"]
 
     memory = get_memory(req.session_id)
 
@@ -128,12 +163,18 @@ def chat(req: ChatRequest):
     return {
         "answer": answer,
         "steps": steps,
+        "role": role,
+        "username": username,
     }
 
 
 @app.post("/clear")
-def clear(req: ChatRequest):
+def clear(req: ChatRequest, authorization: str = Header(None)):
     """清空某会话的记忆"""
+    token = _extract_token(authorization)
+    if not get_user_from_token(token):
+        return JSONResponse({"error": "未登录"}, status_code=401)
+
     if req.session_id in sessions:
         sessions[req.session_id]["memory"].clear()
     return {"ok": True}
