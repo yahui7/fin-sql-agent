@@ -302,7 +302,7 @@
             <div class="demo-accounts">
                 <b>演示账号：</b><br>
                 admin / admin123 —— 管理员（可查询全部数据）<br>
-                view / viewer —— 访客（仅可查看表结构，不可查询数据）
+                view / view123 —— 访客（仅可查看表结构，不可查询数据）
             </div>
         </div>
         <div class="features">
@@ -380,6 +380,9 @@
             }
             return sid;
         }
+        function resetSessionId() {
+            localStorage.removeItem('session_id');
+        }
 
         // ============ 页面切换 ============
         function showChatPage(username, role) {
@@ -427,6 +430,7 @@
                 if (response.ok) {
                     setToken(data.token);
                     setUserInfo(data.username, data.role);
+                    resetSessionId();   // 换账号时重置会话，避免记忆串号
                     closeLoginModal();
                     showChatPage(data.username, data.role);
                 } else {
@@ -449,6 +453,7 @@
             }
             clearToken();
             clearUserInfo();
+            resetSessionId();
             showLoginPage();
         }
 
