@@ -9,8 +9,8 @@ Text2SQL Agent — ReAct 循环核心
 
 import json
 import time
-from config import AGENT_CONFIG
-from llm import chat
+from .config import AGENT_CONFIG
+from .llm import chat
 from tools.registry import TOOL_SCHEMAS, execute_tool
 
 

@@ -10,7 +10,7 @@ from openai import (
     APIConnectionError,
     InternalServerError,
 )
-from config import LLM_CONFIG
+from .config import LLM_CONFIG
 
 client = OpenAI(
     api_key=LLM_CONFIG["api_key"],

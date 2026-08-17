@@ -13,7 +13,7 @@
 """
 
 import secrets
-from config import USERS
+from .config import USERS
 
 # token -> 用户信息（内存存储，重启清空）
 TOKEN_STORE = {}

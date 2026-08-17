@@ -12,17 +12,19 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from agent import run
+from core.agent import run
+from core.schema_docs import build_schema_doc
 
-# 加载系统提示词
+# 加载系统提示词（动态注入数据库结构说明）
 PROMPT_PATH = os.path.join(
     os.path.dirname(os.path.dirname(__file__)), "prompts", "system.md"
 )
 with open(PROMPT_PATH, "r", encoding="utf-8") as f:
-    SYSTEM_PROMPT = f.read()
+    _template = f.read()
+SYSTEM_PROMPT = _template.replace("{{TABLE_SCHEMA}}", build_schema_doc())
 
 # 关闭详细模式，只输出结果
-from config import AGENT_CONFIG
+from core.config import AGENT_CONFIG
 AGENT_CONFIG["verbose"] = False
 
 # ============================================================

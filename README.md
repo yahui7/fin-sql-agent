@@ -44,11 +44,14 @@ MySQL（financial 数据库，4 张表）
 
 | 文件 / 目录 | 用途 |
 |------------|------|
-| `agent.py` | ReAct 循环核心 |
 | `main.py` | 命令行入口 |
-| `llm.py` | DeepSeek API 封装（Function Calling） |
-| `memory.py` | 多轮对话记忆 |
-| `config.py` | 集中配置 |
+| `core/` | 核心模块（Agent、LLM、记忆、配置、认证、元数据） |
+| `core/agent.py` | ReAct 循环核心 |
+| `core/llm.py` | DeepSeek API 封装（Function Calling） |
+| `core/memory.py` | 多轮对话记忆 |
+| `core/config.py` | 集中配置 |
+| `core/schema_docs.py` | 字段元数据（含义注释 + 动态生成表结构） |
+| `core/auth_service.py` | 登录认证（token） |
 | `tools/` | 数据库工具 + 工具注册 |
 | `harness/` | 治理层（权限、护栏、审计、监控） |
 | `web/` | FastAPI Web 服务 + 聊天界面 |

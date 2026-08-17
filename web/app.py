@@ -19,11 +19,11 @@ from fastapi import FastAPI, Request, Header
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
-from config import AGENT_CONFIG, HARNESS_CONFIG
-from agent import run
-from memory import ConversationMemory
+from core.config import AGENT_CONFIG, HARNESS_CONFIG
+from core.agent import run
+from core.memory import ConversationMemory
 from harness import Harness
-from auth_service import login, get_user_from_token, logout
+from core.auth_service import login, get_user_from_token, logout
 
 app = FastAPI(title="金融数据查询 Agent")
 
@@ -43,7 +43,7 @@ PROMPT_PATH = os.path.join(
 with open(PROMPT_PATH, "r", encoding="utf-8") as f:
     _template = f.read()
 
-from schema_docs import build_schema_doc
+from core.schema_docs import build_schema_doc
 SYSTEM_PROMPT = _template.replace("{{TABLE_SCHEMA}}", build_schema_doc())
 
 

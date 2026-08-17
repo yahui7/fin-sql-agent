@@ -16,9 +16,9 @@ import os
 # 确保能找到项目模块
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import AGENT_CONFIG, HARNESS_CONFIG
-from agent import run
-from memory import ConversationMemory
+from core.config import AGENT_CONFIG, HARNESS_CONFIG
+from core.agent import run
+from core.memory import ConversationMemory
 from harness import Harness
 
 
@@ -28,7 +28,7 @@ def load_system_prompt() -> str:
     with open(prompt_path, "r", encoding="utf-8") as f:
         template = f.read()
 
-    from schema_docs import build_schema_doc
+    from core.schema_docs import build_schema_doc
     schema_doc = build_schema_doc()   # 动态生成字段表
     return template.replace("{{TABLE_SCHEMA}}", schema_doc)
 
@@ -52,7 +52,7 @@ def list_models():
     """列出当前 API Key 有权调用的所有模型"""
     try:
         from openai import OpenAI
-        from config import LLM_CONFIG
+        from core.config import LLM_CONFIG
 
         client = OpenAI(
             api_key=LLM_CONFIG["api_key"],

@@ -17,7 +17,7 @@ import mysql.connector
 
 # 把项目根目录加入路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from config import DB_CONFIG
+from core.config import DB_CONFIG
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 

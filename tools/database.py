@@ -10,7 +10,7 @@
 from contextlib import contextmanager
 
 import mysql.connector
-from config import DB_CONFIG
+from core.config import DB_CONFIG
 
 
 def get_conn():

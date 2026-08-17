@@ -101,7 +101,7 @@ def execute_tool(tool_name: str, tool_args: dict) -> str:
     try:
         result = func(**tool_args)
         # 对长结果做截断，避免超出 LLM 上下文
-        from config import AGENT_CONFIG
+        from core.config import AGENT_CONFIG
 
         json_str = json.dumps(result, ensure_ascii=False, default=str)
         limit = AGENT_CONFIG.get("result_truncate", 2000)
