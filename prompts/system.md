@@ -4,66 +4,7 @@
 
 # 数据库结构
 
-数据库包含四张表，所有表之间通过 customer_id、account_id、product_id 关联。
-
-## customer（客户信息表）
-
-| 字段 | 类型 | 说明 |
-|-----|------|------|
-| customer_id | varchar | 客户编号（主键） |
-| name | varchar | 客户姓名 |
-| id_type | varchar | 证件类型（身份证/护照） |
-| id_number | varchar | 证件号码 |
-| id_expiry_date | date | 证件有效期截止日 |
-| nationality | varchar | 国籍 |
-| birth_date | date | 出生日期 |
-| occupation | varchar | 职业 |
-| risk_level | varchar | 风险等级（高/中/低） |
-| phone | varchar | 手机号 |
-| email | varchar | 邮箱 |
-| address | varchar | 通讯地址 |
-
-## account（账户表）
-
-| 字段 | 类型 | 说明 |
-|-----|------|------|
-| account_id | varchar | 账户编号（主键） |
-| customer_id | varchar | 客户编号（外键→customer） |
-| product_id | varchar | 产品编号（外键→product） |
-| account_type | varchar | 账户类型（活期/定期/理财） |
-| status | varchar | 状态（正常/冻结/关户） |
-| balance | decimal | 账户余额 |
-| currency | varchar | 币种（CNY/USD/HKD） |
-| open_date | date | 开户日期 |
-| close_date | date | 关户日期（正常账户为空） |
-
-## transactions（交易流水表）
-
-| 字段 | 类型 | 说明 |
-|-----|------|------|
-| transaction_id | varchar | 交易编号（主键） |
-| account_id | varchar | 账户编号（外键→account） |
-| customer_id | varchar | 客户编号（外键→customer） |
-| transaction_type | varchar | 交易类型（转账/缴费/消费/取现/存款） |
-| amount | decimal | 交易金额 |
-| currency | varchar | 币种 |
-| counterparty_info | varchar | 交易对手信息 |
-| transaction_date | datetime | 交易时间 |
-| channel | varchar | 渠道（手机银行/柜面/网银/ATM） |
-| purpose | varchar | 用途（投资理财/日常消费/投资收益/工资收入等） |
-
-## product（产品表）
-
-| 字段 | 类型 | 说明 |
-|-----|------|------|
-| product_id | varchar | 产品编号（主键） |
-| product_name | varchar | 产品名称 |
-| product_type | varchar | 产品类型（公募-混合型/私募-股票多头/公募-债券型/理财） |
-| risk_level | varchar | 风险等级（高/中/低） |
-| issuer | varchar | 发行机构 |
-| status | varchar | 状态（存续/到期/终止） |
-| launch_date | date | 发行日期 |
-| maturity_date | date | 到期日期 |
+{{TABLE_SCHEMA}}
 
 # 工作流程（严格遵守）
 

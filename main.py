@@ -23,10 +23,14 @@ from harness import Harness
 
 
 def load_system_prompt() -> str:
-    """加载系统提示词文件"""
+    """加载系统提示词，动态注入数据库结构说明"""
     prompt_path = os.path.join(os.path.dirname(__file__), "prompts", "system.md")
     with open(prompt_path, "r", encoding="utf-8") as f:
-        return f.read()
+        template = f.read()
+
+    from schema_docs import build_schema_doc
+    schema_doc = build_schema_doc()   # 动态生成字段表
+    return template.replace("{{TABLE_SCHEMA}}", schema_doc)
 
 
 def print_banner():

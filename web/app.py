@@ -34,14 +34,17 @@ app = FastAPI(title="金融数据查询 Agent")
 harness = Harness(config=HARNESS_CONFIG)
 
 # ============================================================
-# 系统提示词（启动时加载一次）
+# 系统提示词（启动时加载一次，动态注入数据库结构说明）
 # ============================================================
 PROMPT_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
     "prompts", "system.md",
 )
 with open(PROMPT_PATH, "r", encoding="utf-8") as f:
-    SYSTEM_PROMPT = f.read()
+    _template = f.read()
+
+from schema_docs import build_schema_doc
+SYSTEM_PROMPT = _template.replace("{{TABLE_SCHEMA}}", build_schema_doc())
 
 
 # ============================================================
