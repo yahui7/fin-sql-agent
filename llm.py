@@ -2,7 +2,14 @@
 LLM 封装 — DeepSeek API（兼容 OpenAI SDK）
 """
 
-from openai import OpenAI
+import time
+
+from openai import (
+    OpenAI,
+    APITimeoutError,
+    APIConnectionError,
+    InternalServerError,
+)
 from config import LLM_CONFIG
 
 client = OpenAI(
@@ -13,7 +20,7 @@ client = OpenAI(
 
 def chat(messages: list[dict], tools: list[dict] | None = None) -> dict:
     """
-    调用 DeepSeek Chat API
+    调用 DeepSeek Chat API（带超时和重试）
 
     参数:
         messages: 对话历史，OpenAI 格式
@@ -43,7 +50,30 @@ def chat(messages: list[dict], tools: list[dict] | None = None) -> dict:
     if tools:
         kwargs["tools"] = tools
 
-    response = client.chat.completions.create(**kwargs)
+    # ============================================================
+    # 带重试的调用：只对临时性错误重试（超时/网络/5xx）
+    # ============================================================
+    max_retries = LLM_CONFIG.get("max_retries", 2)
+    retry_delay = LLM_CONFIG.get("retry_delay", 2)
+    timeout = LLM_CONFIG.get("timeout", 30)
+
+    for attempt in range(max_retries + 1):
+        try:
+            response = client.chat.completions.create(
+                **kwargs,
+                timeout=timeout,
+            )
+            break   # 成功，跳出重试循环
+        except (APITimeoutError, APIConnectionError, InternalServerError) as e:
+            if attempt == max_retries:
+                # 最后一次也失败，抛给上层
+                raise
+            # 递增退避：2s、4s...
+            sleep_sec = retry_delay * (attempt + 1)
+            print(f"⚠️ LLM 调用失败（{type(e).__name__}），{sleep_sec}s 后重试 "
+                  f"({attempt + 1}/{max_retries})")
+            time.sleep(sleep_sec)
+
     msg = response.choices[0].message
 
     # 构造统一返回格式

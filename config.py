@@ -18,6 +18,9 @@ LLM_CONFIG = {
     "model": os.getenv("DEEPSEEK_MODEL", "deepseek-chat"),
     "temperature": 0.1,
     "max_tokens": 4096,
+    "timeout": 30,          # 单次请求超时（秒）
+    "max_retries": 2,       # 失败重试次数（总共尝试 3 次）
+    "retry_delay": 2,       # 重试间隔基数（秒），递增退避
 }
 
 # ============================================================
