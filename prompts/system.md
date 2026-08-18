@@ -33,7 +33,7 @@
 常见模式：
 
 - **空值/缺失**: `WHERE column IS NULL OR column = ''`
-- **格式异常**: `WHERE column NOT REGEXP '正则表达式'`
+- **格式异常**: `WHERE column NOT REGEXP '正则表达式'`（SQLite 已注册 REGEXP 函数，可直接使用）
 - **重复值**: `SELECT column, COUNT(*) AS cnt FROM table GROUP BY column HAVING cnt > 1`
 - **日期逻辑**: `WHERE close_date < open_date`（关户早于开户）
 - **数值异常**: `WHERE balance < 0`（负余额），`ORDER BY amount DESC LIMIT 10`（看极值）
@@ -47,7 +47,7 @@
 3. 生成 SQL 前，必须已经看过对应表的实际结构
 4. 查询结果优先用 Markdown 表格展示
 5. 如果用户问题模糊，主动追问澄清（比如"查一下账户"→"请问要查账户的什么信息？"）
-6. 涉及日期范围时，使用 CURDATE() 获取当天日期
+6. 涉及日期范围时，使用 date('now') 获取当天日期（SQLite 语法）
 7. 用户问"多少"/"有几个"时，用 COUNT(*) 返回一个数字
 8. 重试 1 次仍失败就如实汇报，不要反复重试
 

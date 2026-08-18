@@ -1,0 +1,27 @@
+# 排除版本控制
+.git
+.gitignore
+
+# 排除环境变量（真实密钥不进镜像）
+.env
+
+# 排除 Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# 排除日志
+logs/
+
+# 排除本地产物
+venv/
+*.db
+
+# 排除 Docker 自身
+Dockerfile
+docker-compose.yaml
+.dockerignore
+
+# 排除根目录文档（注意：prompts/system.md 是运行时必需的，不能排除）
+README.md
+HARNESS.md

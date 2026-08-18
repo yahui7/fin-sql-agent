@@ -1,0 +1,43 @@
+# Fin SQL Agent — 编排 agent + nginx
+#
+# 用法:
+#   docker compose up -d          # 启动
+#   docker compose down           # 停止
+#   docker compose logs -f agent  # 看 agent 日志
+
+services:
+  # ============================================================
+  # Agent 应用
+  # ============================================================
+  agent:
+    build: .
+    container_name: fin-sql-agent
+    # 不映射宿主机端口（agent 只通过 docker 内部网络被 nginx 访问）
+    expose:
+      - "8765"
+    environment:
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_BASE_URL=${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL:-deepseek-chat}
+      - DB_PATH=/app/data/financial.db
+      - TZ=Asia/Shanghai
+    restart: unless-stopped
+    # 内存限制（2核2G 机器上各容器都要限，防止 OOM）
+    mem_limit: 512m
+
+  # ============================================================
+  # Nginx 反向代理（唯一对外入口）
+  # ============================================================
+  nginx:
+    image: nginx:alpine
+    container_name: fin-sql-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - agent
+    restart: unless-stopped
+    mem_limit: 128m

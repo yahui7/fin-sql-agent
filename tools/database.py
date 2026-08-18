@@ -1,5 +1,5 @@
 """
-数据库工具函数
+数据库工具函数（SQLite 版）
 提供三个核心能力：查表结构、看表详情、执行 SQL
 
 安全设计：
@@ -7,15 +7,34 @@
   2. 连接管理：使用 get_cursor() 上下文管理器，保证连接一定关闭
 """
 
+import re
+import sqlite3
 from contextlib import contextmanager
 
-import mysql.connector
 from core.config import DB_CONFIG
 
 
+def _dict_factory(cursor, row):
+    """让 fetchall 返回 dict 列表（等价于 MySQL 的 dictionary=True）"""
+    return {col[0]: row[idx] for idx, col in enumerate(cursor.description)}
+
+
+def _regexp(pattern, value):
+    """注册给 SQLite 的 REGEXP 函数（SQLite 默认不支持）"""
+    if value is None:
+        return False
+    try:
+        return re.search(pattern, value) is not None
+    except re.error:
+        return False
+
+
 def get_conn():
-    """获取 MySQL 数据库连接"""
-    return mysql.connector.connect(**DB_CONFIG)
+    """获取 SQLite 连接"""
+    conn = sqlite3.connect(DB_CONFIG["path"])
+    conn.row_factory = _dict_factory
+    conn.create_function("REGEXP", 2, _regexp)   # 注册 REGEXP
+    return conn
 
 
 @contextmanager
@@ -31,7 +50,7 @@ def get_cursor():
     无论中间是否抛异常，连接都会被关闭，避免连接泄漏。
     """
     conn = get_conn()
-    cur = conn.cursor(dictionary=True)
+    cur = conn.cursor()
     try:
         yield cur
     finally:
@@ -45,10 +64,11 @@ def get_cursor():
 def _get_valid_tables() -> set:
     """查询数据库中真实存在的所有表名"""
     with get_cursor() as cur:
-        cur.execute("SHOW TABLES")
-        # SHOW TABLES 返回 {"Tables_in_<db>": "customer"} 形式
-        tables = {row[list(row.keys())[0]] for row in cur.fetchall()}
-    return tables
+        cur.execute(
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        )
+        return {row["name"] for row in cur.fetchall()}
 
 
 def _validate_table_name(table_name: str) -> str | None:
@@ -76,29 +96,22 @@ def get_schema() -> dict:
     返回数据库中所有表的名称、列名、数据类型、是否可空。
     这是 Agent 的第一个调用的工具——了解有哪些表可用。
     """
-    sql = """
-        SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_COMMENT
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = %s
-        ORDER BY TABLE_NAME, ORDINAL_POSITION
-    """
-    with get_cursor() as cur:
-        cur.execute(sql, (DB_CONFIG["database"],))
-        rows = cur.fetchall()
-
     tables = {}
-    for row in rows:
-        table = row["TABLE_NAME"]
-        if table not in tables:
-            tables[table] = []
-        tables[table].append(
+    for table_name in sorted(_get_valid_tables()):
+        with get_cursor() as cur:
+            cur.execute(f'PRAGMA table_info("{table_name}")')
+            cols = cur.fetchall()
+
+        # PRAGMA table_info 返回: cid, name, type, notnull, dflt_value, pk
+        tables[table_name] = [
             {
-                "column": row["COLUMN_NAME"],
-                "type": row["DATA_TYPE"],
-                "nullable": row["IS_NULLABLE"] == "YES",
-                "comment": row.get("COLUMN_COMMENT", "") or "",
+                "column": c["name"],
+                "type": c["type"],
+                "nullable": c["notnull"] == 0,
+                "comment": "",   # SQLite 无注释，含义由 schema_docs.py 提供
             }
-        )
+            for c in cols
+        ]
 
     return {"tables": tables, "table_count": len(tables)}
 
@@ -122,11 +135,11 @@ def get_table_info(table_name: str) -> dict:
     try:
         with get_cursor() as cur:
             # 总行数
-            cur.execute(f"SELECT COUNT(*) AS cnt FROM `{table_name}`")
+            cur.execute(f'SELECT COUNT(*) AS cnt FROM "{table_name}"')
             count = cur.fetchone()["cnt"]
 
             # 前 3 行样本
-            cur.execute(f"SELECT * FROM `{table_name}` LIMIT 3")
+            cur.execute(f'SELECT * FROM "{table_name}" LIMIT 3')
             rows = cur.fetchall()
             columns = list(rows[0].keys()) if rows else []
 
@@ -174,6 +187,9 @@ def query_db(sql: str) -> dict:
     # === 自动加行数限制 ===
     if "LIMIT" not in upper_sql:
         sql = sql.rstrip(";") + " LIMIT 100"
+
+    # === SQLite 兼容：反引号 → 双引号 ===
+    sql = sql.replace("`", '"')
 
     # === 执行查询 ===
     try:

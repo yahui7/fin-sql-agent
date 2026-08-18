@@ -9,6 +9,9 @@ from dotenv import load_dotenv
 # 加载 .env 文件
 load_dotenv()
 
+# 项目根目录
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 # ============================================================
 # DeepSeek API 配置
 # ============================================================
@@ -24,14 +27,10 @@ LLM_CONFIG = {
 }
 
 # ============================================================
-# MySQL 数据库配置
+# SQLite 数据库配置
 # ============================================================
 DB_CONFIG = {
-    "host": "localhost",
-    "user": "root",
-    "password": os.getenv("MYSQL_PASSWORD"),
-    "database": os.getenv("MYSQL_DATABASE", "financial"),
-    "charset": "utf8mb4",
+    "path": os.getenv("DB_PATH", os.path.join(BASE_DIR, "data", "financial.db")),
 }
 
 # ============================================================

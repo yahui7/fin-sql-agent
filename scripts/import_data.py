@@ -1,19 +1,21 @@
 """
-CSV 数据导入 MySQL 脚本
+CSV 数据导入 SQLite 脚本
 
 用法:
     python import_data.py
 
 前提:
-    1. MySQL 已运行，数据库 financial（或 config.py 中指定的库）已创建
-    2. 已安装依赖: pip install pandas mysql-connector-python
-    3. data/ 目录下有 customer.csv, account.csv, transactions.csv, product.csv
+    1. 已安装依赖: pip install -r requirements.txt
+    2. data/ 目录下有 customer.csv, account.csv, transactions.csv, product.csv
+
+产出:
+    data/financial.db（SQLite 数据库文件）
 """
 
 import os
 import sys
 import csv
-import mysql.connector
+import sqlite3
 
 # 把项目根目录加入路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -21,7 +23,7 @@ from core.config import DB_CONFIG
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 
-# 表名 → CSV 文件名映射
+# 表名 → CSV 文件名映射（顺序重要：先建被引用表）
 TABLES = {
     "customer":     "customer.csv",
     "product":      "product.csv",
@@ -34,7 +36,7 @@ def create_tables(conn):
     """根据 CSV 字段建表"""
     cur = conn.cursor()
 
-    # 删旧表（注意顺序：先删有外键的）
+    # 删旧表（注意顺序：先删有外键的表）
     cur.execute("DROP TABLE IF EXISTS transactions")
     cur.execute("DROP TABLE IF EXISTS account")
     cur.execute("DROP TABLE IF EXISTS product")
@@ -42,65 +44,61 @@ def create_tables(conn):
 
     cur.execute("""
         CREATE TABLE customer (
-            customer_id VARCHAR(20) PRIMARY KEY,
-            name VARCHAR(100),
-            id_type VARCHAR(20),
-            id_number VARCHAR(50),
-            id_expiry_date DATE,
-            nationality VARCHAR(50),
-            birth_date DATE,
-            occupation VARCHAR(100),
-            risk_level VARCHAR(10),
-            phone VARCHAR(20),
-            email VARCHAR(100),
-            address VARCHAR(500)
-        ) CHARACTER SET utf8mb4
+            customer_id TEXT PRIMARY KEY,
+            name TEXT,
+            id_type TEXT,
+            id_number TEXT,
+            id_expiry_date TEXT,
+            nationality TEXT,
+            birth_date TEXT,
+            occupation TEXT,
+            risk_level TEXT,
+            phone TEXT,
+            email TEXT,
+            address TEXT
+        )
     """)
 
     cur.execute("""
         CREATE TABLE product (
-            product_id VARCHAR(20) PRIMARY KEY,
-            product_name VARCHAR(200),
-            product_type VARCHAR(50),
-            risk_level VARCHAR(10),
-            issuer VARCHAR(100),
-            status VARCHAR(20),
-            launch_date DATE,
-            maturity_date DATE
-        ) CHARACTER SET utf8mb4
+            product_id TEXT PRIMARY KEY,
+            product_name TEXT,
+            product_type TEXT,
+            risk_level TEXT,
+            issuer TEXT,
+            status TEXT,
+            launch_date TEXT,
+            maturity_date TEXT
+        )
     """)
 
     cur.execute("""
         CREATE TABLE account (
-            account_id VARCHAR(20) PRIMARY KEY,
-            customer_id VARCHAR(20),
-            product_id VARCHAR(20),
-            account_type VARCHAR(20),
-            status VARCHAR(20),
-            balance DECIMAL(18,2),
-            currency VARCHAR(10),
-            open_date DATE,
-            close_date DATE,
-            FOREIGN KEY (customer_id) REFERENCES customer(customer_id),
-            FOREIGN KEY (product_id) REFERENCES product(product_id)
-        ) CHARACTER SET utf8mb4
+            account_id TEXT PRIMARY KEY,
+            customer_id TEXT,
+            product_id TEXT,
+            account_type TEXT,
+            status TEXT,
+            balance REAL,
+            currency TEXT,
+            open_date TEXT,
+            close_date TEXT
+        )
     """)
 
     cur.execute("""
         CREATE TABLE transactions (
-            transaction_id VARCHAR(20) PRIMARY KEY,
-            account_id VARCHAR(20),
-            customer_id VARCHAR(20),
-            transaction_type VARCHAR(20),
-            amount DECIMAL(18,2),
-            currency VARCHAR(10),
-            counterparty_info VARCHAR(500),
-            transaction_date DATETIME,
-            channel VARCHAR(50),
-            purpose VARCHAR(100),
-            FOREIGN KEY (account_id) REFERENCES account(account_id),
-            FOREIGN KEY (customer_id) REFERENCES customer(customer_id)
-        ) CHARACTER SET utf8mb4
+            transaction_id TEXT PRIMARY KEY,
+            account_id TEXT,
+            customer_id TEXT,
+            transaction_type TEXT,
+            amount REAL,
+            currency TEXT,
+            counterparty_info TEXT,
+            transaction_date TEXT,
+            channel TEXT,
+            purpose TEXT
+        )
     """)
 
     conn.commit()
@@ -117,9 +115,9 @@ def import_csv(conn, table_name, csv_path):
             print(f"  ⚠️ {table_name}: CSV 文件为空")
             return 0
 
-        columns = rows[0].keys()
-        placeholders = ", ".join(["%s"] * len(columns))
-        cols_str = ", ".join([f"`{c}`" for c in columns])
+        columns = list(rows[0].keys())
+        placeholders = ", ".join(["?"] * len(columns))
+        cols_str = ", ".join([f'"{c}"' for c in columns])
 
         sql = f"INSERT INTO {table_name} ({cols_str}) VALUES ({placeholders})"
 
@@ -150,17 +148,15 @@ def main():
         print(f"❌ data 目录不存在: {DATA_DIR}")
         sys.exit(1)
 
-    # 连接数据库
-    db_name = DB_CONFIG.get("database", "financial")
-    print(f"📌 目标数据库: {db_name}")
+    db_path = DB_CONFIG["path"]
+    print(f"📌 目标数据库: {db_path}")
 
-    try:
-        conn = mysql.connector.connect(**DB_CONFIG)
-        print(f"✅ MySQL 连接成功\n")
-    except mysql.connector.Error as e:
-        print(f"❌ MySQL 连接失败: {e}")
-        print("   请检查 config.py 中的 DB_CONFIG")
-        sys.exit(1)
+    # 确保 data 目录存在
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+
+    # 连接 SQLite
+    conn = sqlite3.connect(db_path)
+    print("✅ SQLite 连接成功\n")
 
     # 建表
     print("📦 创建表结构...")
