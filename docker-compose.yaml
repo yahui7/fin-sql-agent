@@ -37,6 +37,9 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx/certs:/etc/nginx/certs:ro
+      # webroot 目录：certbot 在宿主机写入验证文件，nginx 容器读取
+      # 宿主机 ./nginx/www ↔ 容器 /var/www/certbot
+      - ./nginx/www:/var/www/certbot:ro
     depends_on:
       - agent
     restart: unless-stopped
