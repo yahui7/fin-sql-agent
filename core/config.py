@@ -33,6 +33,11 @@ DB_CONFIG = {
     "path": os.getenv("DB_PATH", os.path.join(BASE_DIR, "data", "financial.db")),
 }
 
+# token 认证数据库（独立于业务数据，避免数据导入时误删）
+AUTH_DB_PATH = os.getenv(
+    "AUTH_DB_PATH", os.path.join(BASE_DIR, "data", "auth.db")
+)
+
 # ============================================================
 # Agent 配置
 # ============================================================

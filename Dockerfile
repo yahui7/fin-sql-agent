@@ -1,5 +1,6 @@
 # Fin SQL Agent — Docker 镜像
-FROM python:3.11-slim
+# 国内部署：基础镜像用华为云源（docker.io 被墙）
+FROM swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/python:3.11-slim
 
 # 设置工作目录
 WORKDIR /app
@@ -10,8 +11,10 @@ ENV TZ=Asia/Shanghai
 # 先复制依赖文件，利用 Docker 层缓存（依赖不变就不用重装）
 COPY requirements.txt .
 
-# 安装依赖
-RUN pip install --no-cache-dir -r requirements.txt
+# 安装依赖（用阿里云 pip 源，files.pythonhosted.org 被墙）
+RUN pip install --no-cache-dir -r requirements.txt \
+    -i https://mirrors.aliyun.com/pypi/simple/ \
+    --trusted-host mirrors.aliyun.com
 
 # 复制项目代码
 COPY . .
