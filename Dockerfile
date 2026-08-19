@@ -19,11 +19,14 @@ RUN pip install --no-cache-dir -r requirements.txt \
 # 复制项目代码
 COPY . .
 
-# 生成 SQLite 数据库（从 CSV 导入）
-RUN python scripts/import_data.py
+# 设置启动脚本权限
+RUN chmod +x /app/scripts/entrypoint.sh
 
 # 暴露端口（容器内 Gunicorn 监听 8765，由 nginx 反代）
 EXPOSE 8765
+
+# 入口：启动时检查数据库，未初始化则导入数据（不在这里生成，避免被挂载目录覆盖）
+ENTRYPOINT ["/app/scripts/entrypoint.sh"]
 
 # 启动命令：Gunicorn + Uvicorn worker
 # 内网部署用 --bind 0.0.0.0，因为 nginx 在另一个容器里，通过 docker 网络访问
