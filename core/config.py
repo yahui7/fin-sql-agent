@@ -57,7 +57,11 @@ HARNESS_CONFIG = {
         "viewer": {"tools": ["get_schema", "get_table_info"]},
     },
     "audit": {
-        "log_file": "logs/audit.log",
+        # 绝对路径（基于项目根目录），保证 Docker 容器内也能正确落盘；
+        # 可用环境变量 AUDIT_LOG_FILE 覆盖（如日志中心路径）
+        "log_file": os.getenv(
+            "AUDIT_LOG_FILE", os.path.join(BASE_DIR, "logs", "audit.log")
+        ),
     },
 }
 
